@@ -3,6 +3,7 @@
 # GitHubScrap is a simple Python 3 script that automates GitHub OSINT during early stages of Red Team exercises
 # author - mamatb (t.me/m_amatb)
 # location - https://github.com/mamatb/GitHubScrap
+# style guide - https://google.github.io/styleguide/pyguide.html
 
 # TODO
 #
