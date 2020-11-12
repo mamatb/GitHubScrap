@@ -114,7 +114,6 @@ def github_login(github_http_session, github_username, github_password, github_o
         github_soup_twofactor = BeautifulSoup(github_html_twofactor.text, 'html.parser')
         data = {
             'authenticity_token': github_soup_twofactor.find('input', {'name': 'authenticity_token'})['value'],
-            'otp': '',
         }
     except Exception as exception:
         raise MsgException('Unable to log in to GitHub (credentials)', exception)
