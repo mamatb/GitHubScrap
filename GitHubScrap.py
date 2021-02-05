@@ -13,17 +13,19 @@
 # parse web forms instead of forging them
 # use argument parser (argparse)
 # create requirements.txt file
-# slow down queries (https://developer.github.com/v3/search/#rate-limit)
 
 import sys
-import os
-import re
-import requests
 import json
-import pyotp
-import datetime
-from urllib.parse import urlencode, quote_plus
+from re import compile
+from time import sleep
+from pyotp import TOTP
+from os.path import exists
+from requests import session
+from datetime import datetime
 from bs4 import BeautifulSoup
+from urllib.parse import urlencode, quote_plus
+
+GITHUB_HTTP_DELAY = 1.5
 
 class MsgException(Exception):
     def __init__(self, message, exception, *args, **kwargs):
@@ -71,7 +73,7 @@ def save_output(data_input, output_path):
     """json output file writing"""
 
     try:
-        if os.path.exists(output_path):
+        if exists(output_path):
             with open(output_path, 'r+') as output_file:
                 data_file = json.load(output_file)
                 data_input.update(data_file)
@@ -90,6 +92,7 @@ def github_login(github_http_session, github_username, github_password, github_o
         github_html_login = github_http_session.get(
             'https://github.com/login',
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_soup_login = BeautifulSoup(github_html_login.text, 'html.parser')
         data = {
             'commit': 'Sign in',
@@ -98,7 +101,7 @@ def github_login(github_http_session, github_username, github_password, github_o
             'password': github_password,
             'webauthn-support': 'supported',
             'webauthn-iuvpaa-support': 'unsupported',
-            github_soup_login.find('input', {'name': re.compile('required_field_')})['name']: '',
+            github_soup_login.find('input', {'name': compile('required_field_')})['name']: '',
             'timestamp': github_soup_login.find('input', {'name': 'timestamp'})['value'],
             'timestamp_secret': github_soup_login.find('input', {'name': 'timestamp_secret'})['value'],
         }
@@ -111,6 +114,7 @@ def github_login(github_http_session, github_username, github_password, github_o
             'https://github.com/session',
             data = urlencode(data),
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_soup_twofactor = BeautifulSoup(github_html_twofactor.text, 'html.parser')
         data = {
             'authenticity_token': github_soup_twofactor.find('input', {'name': 'authenticity_token'})['value'],
@@ -119,11 +123,12 @@ def github_login(github_http_session, github_username, github_password, github_o
         raise MsgException('Unable to log in to GitHub (credentials)', exception)
 
     try: # 3rd request (submit the OTP form)
-        data.update({'otp': pyotp.TOTP(github_otp).now()})
+        data.update({'otp': TOTP(github_otp).now()})
         github_http_session.post(
             'https://github.com/sessions/two-factor',
             data = urlencode(data),
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
     except Exception as exception:
         raise MsgException('Unable to log in to GitHub (OTP)', exception)
@@ -135,6 +140,7 @@ def github_search_count(github_http_session, github_query_term, github_type):
         github_html_count = github_http_session.get(
             f'https://github.com/search/count?q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_soup_count = BeautifulSoup(github_html_count.text, 'html.parser')
         github_count = github_soup_count.span.text
     except Exception as exception:
@@ -148,6 +154,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
         github_html_pages = github_http_session.get(
             f'https://github.com/search?o=desc&q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_soup_pages = BeautifulSoup(github_html_pages.text, 'html.parser')
         github_pages_tag = github_soup_pages.find('em', {'data-total-pages': True})
         github_pages = github_pages_tag['data-total-pages'] if github_pages_tag else 1
@@ -156,8 +163,9 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
             github_html_page = github_http_session.get(
                 f'https://github.com/search?o=desc&p={github_page + 1}&q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
             )
+            sleep(GITHUB_HTTP_DELAY)
             github_soup_page = BeautifulSoup(github_html_page.text, 'html.parser')
-            github_search_date = datetime.datetime.now().strftime('%F %T')
+            github_search_date = datetime.now().strftime('%F %T')
             for github_search_result in github_soup_page.find_all('a', {'data-hydro-click': True}):
                 data.update({f'''https://github.com{github_search_result['href']}''': f'{github_search_date}'})
     except Exception as exception:
@@ -171,6 +179,7 @@ def github_logout(github_http_session):
         github_html_root = github_http_session.get(
             'https://github.com',
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_soup_root = BeautifulSoup(github_html_root.text, 'html.parser')
         data = {
             'authenticity_token': github_soup_root.find('input', {'name': 'authenticity_token'})['value'],
@@ -184,6 +193,7 @@ def github_logout(github_http_session):
             'https://github.com/logout',
             data = urlencode(data),
         )
+        sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
     except Exception as exception:
         raise MsgException('Unable to log out from GitHub', exception)
@@ -197,7 +207,7 @@ def main():
         if github_query_exact:
             for term_index, term_value in enumerate(github_query_terms):
                 github_query_terms[term_index] = f'"{term_value}"'
-        github_http_session = requests.session()
+        github_http_session = session()
         headers = {
             'User-Agent': 'Mozilla Firefox Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:53.0) Gecko/20100101 Firefox/53.0',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
