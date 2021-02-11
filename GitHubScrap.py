@@ -8,7 +8,6 @@
 # TODO
 #
 # use colored output
-# report new findings via slack notifications
 # classify findings by query term and github type
 # parse web forms instead of forging them
 # use argument parser (argparse)
@@ -16,16 +15,17 @@
 
 import sys
 import json
+import requests
 from re import compile
 from time import sleep
 from pyotp import TOTP
 from os.path import exists
-from requests import session
 from datetime import datetime
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode, quote_plus
 
 GITHUB_HTTP_DELAY = 1.5
+SLACK_HTTP_DELAY = 1.5
 
 class MsgException(Exception):
     def __init__(self, message, exception, *args, **kwargs):
@@ -65,25 +65,70 @@ def load_config(config_path):
             github_otp = config_json.get('github_otp')
             github_query_exact = config_json.get('github_query_exact')
             github_query_terms = config_json.get('github_query_terms')
+            slack_webhook = config_json.get('slack_webhook')
     except Exception as exception:
         raise MsgException('Config file could not be read', exception)
-    return github_username, github_password, github_otp, github_query_exact, github_query_terms
+    return github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook
 
-def save_output(data_input, output_path):
+def save_output_return_unseen(urls_dict_new, output_path):
     """json output file writing"""
 
     try:
+        urls_new = set(urls_dict_new.keys())
+        urls_old = {}
         if exists(output_path):
             with open(output_path, 'r+') as output_file:
-                data_file = json.load(output_file)
-                data_input.update(data_file)
+                urls_dict_old = json.load(output_file)
+                urls_old = set(urls_dict_old.keys())
+                urls_dict_new.update(urls_dict_old)
                 output_file.seek(0)
-                json.dump(data_input, output_file)
+                json.dump(urls_dict_new, output_file)
         else:
             with open(output_path, 'w') as output_file:
-                json.dump(data_input, output_file)
+                json.dump(urls_dict_new, output_file)
     except Exception as exception:
         raise MsgException('Output file could not be written', exception)
+    return urls_new.difference(urls_old)
+
+def notify_slack(urls_unseen, slack_webhook):
+    """Slack notification through webhook"""
+
+    try:
+        print_info('sending Slack notifications...')
+        slack_http_headers = {
+            'User-Agent': 'GitHubScrap',
+            'Content-type': 'application/json',
+        }
+        slack_http_data = {}
+        urls_string = ''
+        urls_count = 0
+        for url in urls_unseen:
+            urls_string += f'{url}\n'
+            urls_count += 1
+            if not (urls_count % 8):
+                slack_http_data.update({
+                    'text': urls_string,
+                })
+                requests.post(
+                    slack_webhook,
+                    headers = slack_http_headers,
+                    data = json.dumps(slack_http_data),
+                )
+                sleep(SLACK_HTTP_DELAY)
+                urls_string = ''
+        if urls_string:
+            slack_http_data.update({
+                'text': urls_string,
+            })
+            requests.post(
+                slack_webhook,
+                headers = slack_http_headers,
+                data = json.dumps(slack_http_data),
+            )
+            sleep(SLACK_HTTP_DELAY)
+            urls_string = ''
+    except Exception as exception:
+        raise MsgException('Slack notifications could not be sent', exception)
 
 def github_login(github_http_session, github_username, github_password, github_otp):
     """github logging in (3 requests needed)"""
@@ -94,7 +139,7 @@ def github_login(github_http_session, github_username, github_password, github_o
         )
         sleep(GITHUB_HTTP_DELAY)
         github_soup_login = BeautifulSoup(github_html_login.text, 'html.parser')
-        data = {
+        form_data_login = {
             'commit': 'Sign in',
             'authenticity_token': github_soup_login.find('input', {'name': 'authenticity_token'})['value'],
             'login': github_username,
@@ -109,24 +154,28 @@ def github_login(github_http_session, github_username, github_password, github_o
         raise MsgException('Unable to HTTP-GET GitHub login data', exception)
 
     try: # 2nd request (submit the login form and grab some data needed for the OTP form)
-        github_http_session.headers.update({'Content-Type': 'application/x-www-form-urlencoded'})
+        github_http_session.headers.update({
+            'Content-Type': 'application/x-www-form-urlencoded',
+        })
         github_html_twofactor = github_http_session.post(
             'https://github.com/session',
-            data = urlencode(data),
+            data = urlencode(form_data_login),
         )
         sleep(GITHUB_HTTP_DELAY)
         github_soup_twofactor = BeautifulSoup(github_html_twofactor.text, 'html.parser')
-        data = {
+        form_data_otp = {
             'authenticity_token': github_soup_twofactor.find('input', {'name': 'authenticity_token'})['value'],
         }
     except Exception as exception:
         raise MsgException('Unable to log in to GitHub (credentials)', exception)
 
     try: # 3rd request (submit the OTP form)
-        data.update({'otp': TOTP(github_otp).now()})
+        form_data_otp.update({
+            'otp': TOTP(github_otp).now(),
+        })
         github_http_session.post(
             'https://github.com/sessions/two-factor',
-            data = urlencode(data),
+            data = urlencode(form_data_otp),
         )
         sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
@@ -158,7 +207,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
         github_soup_pages = BeautifulSoup(github_html_pages.text, 'html.parser')
         github_pages_tag = github_soup_pages.find('em', {'data-total-pages': True})
         github_pages = github_pages_tag['data-total-pages'] if github_pages_tag else 1
-        data = {}
+        github_search_result = {}
         for github_page in range(int(github_pages)):
             github_html_page = github_http_session.get(
                 f'https://github.com/search?o=desc&p={github_page + 1}&q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
@@ -166,11 +215,13 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
             sleep(GITHUB_HTTP_DELAY)
             github_soup_page = BeautifulSoup(github_html_page.text, 'html.parser')
             github_search_date = datetime.now().strftime('%F %T')
-            for github_search_result in github_soup_page.find_all('a', {'data-hydro-click': True}):
-                data.update({f'''https://github.com{github_search_result['href']}''': f'{github_search_date}'})
+            for github_search_occurrence in github_soup_page.find_all('a', {'data-hydro-click': True}):
+                github_search_result.update({
+                    f'''https://github.com{github_search_occurrence['href']}''': f'{github_search_date}',
+                })
     except Exception as exception:
         raise MsgException('Unable to retrieve GitHub search results', exception)
-    return data
+    return github_search_result
 
 def github_logout(github_http_session):
     """github logging out (2 requests needed)"""
@@ -181,17 +232,19 @@ def github_logout(github_http_session):
         )
         sleep(GITHUB_HTTP_DELAY)
         github_soup_root = BeautifulSoup(github_html_root.text, 'html.parser')
-        data = {
+        form_data_logout = {
             'authenticity_token': github_soup_root.find('input', {'name': 'authenticity_token'})['value'],
         }
     except Exception as exception:
         raise MsgException('Unable to HTTP-GET GitHub logout data', exception)
 
     try: # 2nd request (submit the logout form)
-        github_http_session.headers.update({'Content-Type': 'application/x-www-form-urlencoded'})
+        github_http_session.headers.update({
+            'Content-Type': 'application/x-www-form-urlencoded',
+        })
         github_http_session.post(
             'https://github.com/logout',
-            data = urlencode(data),
+            data = urlencode(form_data_logout),
         )
         sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
@@ -199,16 +252,18 @@ def github_logout(github_http_session):
         raise MsgException('Unable to log out from GitHub', exception)
 
 def main():
+    """main"""
+
     if len(sys.argv) != 3:
         print_usage()
         sys.exit(-1)
     try:
-        github_username, github_password, github_otp, github_query_exact, github_query_terms = load_config(sys.argv[1])
+        github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook = load_config(sys.argv[1])
         if github_query_exact:
             for term_index, term_value in enumerate(github_query_terms):
                 github_query_terms[term_index] = f'"{term_value}"'
-        github_http_session = session()
-        headers = {
+        github_http_session = requests.session()
+        github_http_headers = {
             'User-Agent': 'Mozilla Firefox Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:53.0) Gecko/20100101 Firefox/53.0',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Encoding': 'gzip, deflate',
@@ -216,7 +271,7 @@ def main():
             'Connection': 'close',
             'Referer': 'https://github.com/',
         }
-        github_http_session.headers.update(headers)
+        github_http_session.headers.update(github_http_headers)
         github_login(github_http_session, github_username, github_password, github_otp)
         github_types = [
             'repositories',
@@ -233,11 +288,11 @@ def main():
         for github_query_term in github_query_terms:
             for github_type in github_types:                
                 github_count = github_search_count(github_http_session, github_query_term, github_type)
-                print_info(
-                    f'{github_count} results while looking for {github_query_term} ({github_type})'
-                )
+                print_info(f'{github_count} results while looking for {github_query_term} ({github_type})')
                 if github_count != '0':
-                    save_output(github_search_retrieval(github_http_session, github_query_term, github_type), sys.argv[2])
+                    unseen_urls = save_output_return_unseen(github_search_retrieval(github_http_session, github_query_term, github_type), sys.argv[2])
+                    if slack_webhook and unseen_urls:
+                        notify_slack(unseen_urls, slack_webhook)
     except MsgException as msg_exception:
         panic(msg_exception)
     finally:
