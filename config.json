@@ -3,5 +3,6 @@
         "github_password": "password",
         "github_otp": "base32secret3232",
         "github_query_exact": true,
-        "github_query_terms": ["lorem-ipsum.org"]
+        "github_query_terms": ["lorem-ipsum.org"],
+        "slack_webhook": null
 }
