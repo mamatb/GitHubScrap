@@ -11,7 +11,6 @@
 # classify findings by query term and github type
 # parse web forms instead of forging them
 # use argument parser (argparse)
-# create requirements.txt file
 
 import sys
 import json
