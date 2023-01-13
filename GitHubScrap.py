@@ -66,8 +66,8 @@ def load_config(config_path):
             github_query_exact = config_json.get('github_query_exact')
             github_query_terms = config_json.get('github_query_terms')
             slack_webhook = config_json.get('slack_webhook')
-    except BaseException as exception:
-        raise MsgException('Config file could not be read', exception)
+    except Exception as e:
+        raise MsgException('Config file could not be read', e)
     return github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook
 
 def save_output_return_unseen(urls_dict_new, output_path):
@@ -86,8 +86,8 @@ def save_output_return_unseen(urls_dict_new, output_path):
         else:
             with open(output_path, 'w') as output_file:
                 json.dump(urls_dict_new, output_file)
-    except BaseException as exception:
-        raise MsgException('Output file could not be written', exception)
+    except Exception as e:
+        raise MsgException('Output file could not be written', e)
     return urls_new.difference(urls_old)
 
 def notify_slack(urls_unseen, slack_webhook):
@@ -127,8 +127,8 @@ def notify_slack(urls_unseen, slack_webhook):
             )
             sleep(SLACK_HTTP_DELAY)
             urls_string = ''
-    except BaseException as exception:
-        raise MsgException('Slack notifications could not be sent', exception)
+    except Exception as e:
+        raise MsgException('Slack notifications could not be sent', e)
 
 def github_login(github_http_session, github_username, github_password, github_otp):
     """github logging in (3 requests needed)"""
@@ -150,8 +150,8 @@ def github_login(github_http_session, github_username, github_password, github_o
             'timestamp': github_soup_login.find('input', {'name': 'timestamp'})['value'],
             'timestamp_secret': github_soup_login.find('input', {'name': 'timestamp_secret'})['value'],
         }
-    except BaseException as exception:
-        raise MsgException('Unable to HTTP-GET GitHub login data', exception)
+    except Exception as e:
+        raise MsgException('Unable to HTTP-GET GitHub login data', e)
 
     try: # 2nd request (submit the login form and grab some data needed for the OTP form)
         github_http_session.headers.update({
@@ -166,8 +166,8 @@ def github_login(github_http_session, github_username, github_password, github_o
         form_data_otp = {
             'authenticity_token': github_soup_twofactor.find('input', {'name': 'authenticity_token'})['value'],
         }
-    except BaseException as exception:
-        raise MsgException('Unable to log in to GitHub (credentials)', exception)
+    except Exception as e:
+        raise MsgException('Unable to log in to GitHub (credentials)', e)
 
     try: # 3rd request (submit the OTP form)
         form_data_otp.update({
@@ -179,8 +179,8 @@ def github_login(github_http_session, github_username, github_password, github_o
         )
         sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
-    except BaseException as exception:
-        raise MsgException('Unable to log in to GitHub (OTP)', exception)
+    except Exception as e:
+        raise MsgException('Unable to log in to GitHub (OTP)', e)
 
 def github_search_count(github_http_session, github_query_term, github_type):
     """search results count"""
@@ -192,8 +192,8 @@ def github_search_count(github_http_session, github_query_term, github_type):
         sleep(GITHUB_HTTP_DELAY)
         github_soup_count = BeautifulSoup(github_html_count.text, 'html.parser')
         github_count = github_soup_count.span.text
-    except BaseException as exception:
-        raise MsgException('Unable to count GitHub search results', exception)
+    except Exception as e:
+        raise MsgException('Unable to count GitHub search results', e)
     return github_count
 
 def github_search_retrieval(github_http_session, github_query_term, github_type):
@@ -219,8 +219,8 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
                 github_search_result.update({
                     f'''https://github.com{github_search_occurrence['href']}''': f'{github_search_date}',
                 })
-    except BaseException as exception:
-        raise MsgException('Unable to retrieve GitHub search results', exception)
+    except Exception as e:
+        raise MsgException('Unable to retrieve GitHub search results', e)
     return github_search_result
 
 def github_logout(github_http_session):
@@ -235,8 +235,8 @@ def github_logout(github_http_session):
         form_data_logout = {
             'authenticity_token': github_soup_root.find('input', {'name': 'authenticity_token'})['value'],
         }
-    except BaseException as exception:
-        raise MsgException('Unable to HTTP-GET GitHub logout data', exception)
+    except Exception as e:
+        raise MsgException('Unable to HTTP-GET GitHub logout data', e)
 
     try: # 2nd request (submit the logout form)
         github_http_session.headers.update({
@@ -248,8 +248,8 @@ def github_logout(github_http_session):
         )
         sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
-    except BaseException as exception:
-        raise MsgException('Unable to log out from GitHub', exception)
+    except Exception as e:
+        raise MsgException('Unable to log out from GitHub', e)
 
 def main():
     """main"""
