@@ -37,12 +37,12 @@ class MsgException(Exception):
         return f'[!] Error! {self.message}:\n    {self.exception}'
 
 def panic(msg_exception):
-    """exception handling"""
+    '''exception handling'''
 
     print(msg_exception, file = sys.stderr)
 
 def print_usage():
-    """usage printing"""
+    '''usage printing'''
 
     print(
         '[!] Wrong syntax. Usage:\n'
@@ -50,12 +50,12 @@ def print_usage():
     , file = sys.stderr)
 
 def print_info(message):
-    """additional info printing"""
+    '''additional info printing'''
 
     print(f'[!] Info: {message}', file = sys.stdout)
 
 def load_config(config_path):
-    """json config file reading"""
+    '''JSON config file reading'''
 
     try:
         with open(config_path, 'r') as config_file:
@@ -71,7 +71,7 @@ def load_config(config_path):
     return github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook
 
 def save_output_return_unseen(urls_dict_new, output_path):
-    """json output file writing"""
+    '''JSON output file writing'''
 
     try:
         urls_new = set(urls_dict_new.keys())
@@ -91,7 +91,7 @@ def save_output_return_unseen(urls_dict_new, output_path):
     return urls_new.difference(urls_old)
 
 def notify_slack(urls_unseen, slack_webhook):
-    """Slack notification through webhook"""
+    '''Slack notification through webhook'''
 
     try:
         print_info('sending Slack notifications...')
@@ -131,7 +131,7 @@ def notify_slack(urls_unseen, slack_webhook):
         raise MsgException('Slack notifications could not be sent', e)
 
 def github_login(github_http_session, github_username, github_password, github_otp):
-    """github logging in (3 requests needed)"""
+    '''github logging in (3 requests needed)'''
 
     try: # 1st request (grab some data needed for the login form)
         github_html_login = github_http_session.get(
@@ -183,7 +183,7 @@ def github_login(github_http_session, github_username, github_password, github_o
         raise MsgException('Unable to log in to GitHub (OTP)', e)
 
 def github_search_count(github_http_session, github_query_term, github_type):
-    """search results count"""
+    '''search results count'''
 
     try:
         github_html_count = github_http_session.get(
@@ -197,7 +197,7 @@ def github_search_count(github_http_session, github_query_term, github_type):
     return github_count
 
 def github_search_retrieval(github_http_session, github_query_term, github_type):
-    """search results retrieval"""
+    '''search results retrieval'''
 
     try:
         github_html_pages = github_http_session.get(
@@ -224,7 +224,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
     return github_search_result
 
 def github_logout(github_http_session):
-    """github logging out (2 requests needed)"""
+    '''github logging out (2 requests needed)'''
 
     try: # 1st request (grab some data needed for the logout form)
         github_html_root = github_http_session.get(
@@ -252,7 +252,7 @@ def github_logout(github_http_session):
         raise MsgException('Unable to log out from GitHub', e)
 
 def main():
-    """main"""
+    '''main'''
 
     if len(sys.argv) != 3:
         print_usage()
