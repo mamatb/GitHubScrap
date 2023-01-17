@@ -28,18 +28,18 @@ GITHUB_HTTP_DELAY = 1.5
 SLACK_HTTP_DELAY = 1.5
 
 class MsgException(Exception):
-    def __init__(self, message, exception, *args, **kwargs):
+    def __init__(self, message='Unknown error', exception, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.message = message
         self.exception = exception
 
+    def __str__(self):
+        return f'[!] Error! {self.message}:\n    {self.exception}'
+
 def panic(msg_exception):
     """exception handling"""
 
-    print(
-        f'[!] Error! {msg_exception.message}:\n'
-        f'    {msg_exception.exception}'
-    , file = sys.stderr)
+    print(msg_exception, file = sys.stderr)
 
 def print_usage():
     """usage printing"""
