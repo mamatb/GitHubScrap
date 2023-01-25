@@ -260,7 +260,7 @@ def main():
     try:
         github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook = load_config(sys.argv[1])
         if github_query_exact:
-            github_query_terms = [f'"{term}"' for term in github_query_terms]
+            github_query_terms = [f'"{github_query_term}"' for github_query_term in github_query_terms]
         github_http_session = requests.session()
         github_http_headers = {
             'User-Agent': 'Mozilla Firefox Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:53.0) Gecko/20100101 Firefox/53.0',
