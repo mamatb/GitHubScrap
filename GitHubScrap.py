@@ -105,7 +105,7 @@ def notify_slack(urls_unseen, slack_webhook):
         for url in urls_unseen:
             urls_string += f'{url}\n'
             urls_count += 1
-            if not (urls_count % 8):
+            if not urls_count % 8:
                 slack_http_data.update({
                     'text': urls_string,
                 })
