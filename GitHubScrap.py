@@ -58,7 +58,7 @@ def load_config(config_path):
     '''JSON config file reading'''
 
     try:
-        with open(config_path, 'r') as config_file:
+        with open(config_path) as config_file:
             config_json = json.load(config_file)
             github_username = config_json.get('github_username')
             github_password = config_json.get('github_password')
