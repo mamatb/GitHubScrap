@@ -7,6 +7,7 @@
 
 # TODO
 #
+# readme.md
 # use colored output
 # classify findings by query term and github type
 # parse web forms instead of forging them
