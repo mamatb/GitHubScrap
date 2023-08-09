@@ -294,6 +294,8 @@ def main():
                         notify_slack(unseen_urls, slack_webhook)
     except MsgException as msg_exception:
         panic(msg_exception)
+    except Exception as e:
+        panic(MsgException(e))
     finally:
         try:
             github_logout(github_http_session)
