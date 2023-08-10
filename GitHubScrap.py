@@ -13,16 +13,16 @@
 # use argument parser (argparse)
 # add module docstring
 
+import re
+import bs4
 import sys
 import json
+import time
+import pyotp
 import requests
-from re import compile
-from time import sleep
-from pyotp import TOTP
-from os.path import exists
+from os import path
+from urllib import parse
 from datetime import datetime
-from bs4 import BeautifulSoup
-from urllib.parse import urlencode, quote_plus
 
 GITHUB_HTTP_DELAY = 1.5
 SLACK_HTTP_DELAY = 1.5
@@ -76,7 +76,7 @@ def save_output_return_unseen(urls_dict_new, output_path):
     try:
         urls_new = set(urls_dict_new.keys())
         urls_old = {}
-        if exists(output_path):
+        if path.exists(output_path):
             with open(output_path, 'r+') as output_file:
                 urls_dict_old = json.load(output_file)
                 urls_old = set(urls_dict_old.keys())
@@ -114,7 +114,7 @@ def notify_slack(urls_unseen, slack_webhook):
                     headers = slack_http_headers,
                     data = json.dumps(slack_http_data),
                 )
-                sleep(SLACK_HTTP_DELAY)
+                time.sleep(SLACK_HTTP_DELAY)
                 urls_string = ''
         if urls_string:
             slack_http_data.update({
@@ -125,7 +125,7 @@ def notify_slack(urls_unseen, slack_webhook):
                 headers = slack_http_headers,
                 data = json.dumps(slack_http_data),
             )
-            sleep(SLACK_HTTP_DELAY)
+            time.sleep(SLACK_HTTP_DELAY)
             urls_string = ''
     except Exception as e:
         raise MsgException(e, 'Unable to send Slack notifications')
@@ -137,8 +137,8 @@ def github_login(github_http_session, github_username, github_password, github_o
         github_html_login = github_http_session.get(
             'https://github.com/login',
         )
-        sleep(GITHUB_HTTP_DELAY)
-        github_soup_login = BeautifulSoup(github_html_login.text, 'html.parser')
+        time.sleep(GITHUB_HTTP_DELAY)
+        github_soup_login = bs4.BeautifulSoup(github_html_login.text, 'html.parser')
         form_data_login = {
             'commit': 'Sign in',
             'authenticity_token': github_soup_login.find('input', {'name': 'authenticity_token'})['value'],
@@ -146,7 +146,7 @@ def github_login(github_http_session, github_username, github_password, github_o
             'password': github_password,
             'webauthn-support': 'supported',
             'webauthn-iuvpaa-support': 'unsupported',
-            github_soup_login.find('input', {'name': compile('required_field_')})['name']: '',
+            github_soup_login.find('input', {'name': re.compile('required_field_')})['name']: '',
             'timestamp': github_soup_login.find('input', {'name': 'timestamp'})['value'],
             'timestamp_secret': github_soup_login.find('input', {'name': 'timestamp_secret'})['value'],
         }
@@ -159,10 +159,10 @@ def github_login(github_http_session, github_username, github_password, github_o
         })
         github_html_twofactor = github_http_session.post(
             'https://github.com/session',
-            data = urlencode(form_data_login),
+            data = parse.urlencode(form_data_login),
         )
-        sleep(GITHUB_HTTP_DELAY)
-        github_soup_twofactor = BeautifulSoup(github_html_twofactor.text, 'html.parser')
+        time.sleep(GITHUB_HTTP_DELAY)
+        github_soup_twofactor = bs4.BeautifulSoup(github_html_twofactor.text, 'html.parser')
         form_data_otp = {
             'authenticity_token': github_soup_twofactor.find('input', {'name': 'authenticity_token'})['value'],
         }
@@ -171,13 +171,13 @@ def github_login(github_http_session, github_username, github_password, github_o
 
     try: # 3rd request (submit the OTP form)
         form_data_otp.update({
-            'otp': TOTP(github_otp).now(),
+            'otp': pyotp.TOTP(github_otp).now(),
         })
         github_http_session.post(
             'https://github.com/sessions/two-factor',
-            data = urlencode(form_data_otp),
+            data = parse.urlencode(form_data_otp),
         )
-        sleep(GITHUB_HTTP_DELAY)
+        time.sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
     except Exception as e:
         raise MsgException(e, 'Unable to log in to GitHub (OTP)')
@@ -187,10 +187,10 @@ def github_search_count(github_http_session, github_query_term, github_type):
 
     try:
         github_html_count = github_http_session.get(
-            f'https://github.com/search/count?q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
+            f'https://github.com/search/count?q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
         )
-        sleep(GITHUB_HTTP_DELAY)
-        github_soup_count = BeautifulSoup(github_html_count.text, 'html.parser')
+        time.sleep(GITHUB_HTTP_DELAY)
+        github_soup_count = bs4.BeautifulSoup(github_html_count.text, 'html.parser')
         github_count = github_soup_count.span.text
     except Exception as e:
         raise MsgException(e, 'Unable to count GitHub search results')
@@ -201,19 +201,19 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
 
     try:
         github_html_pages = github_http_session.get(
-            f'https://github.com/search?o=desc&q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
+            f'https://github.com/search?o=desc&q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
         )
-        sleep(GITHUB_HTTP_DELAY)
-        github_soup_pages = BeautifulSoup(github_html_pages.text, 'html.parser')
+        time.sleep(GITHUB_HTTP_DELAY)
+        github_soup_pages = bs4.BeautifulSoup(github_html_pages.text, 'html.parser')
         github_pages_tag = github_soup_pages.find('em', {'data-total-pages': True})
         github_pages = github_pages_tag['data-total-pages'] if github_pages_tag else 1
         github_search_result = {}
         for github_page in range(int(github_pages)):
             github_html_page = github_http_session.get(
-                f'https://github.com/search?o=desc&p={github_page + 1}&q={quote_plus(github_query_term)}&type={quote_plus(github_type)}',
+                f'https://github.com/search?o=desc&p={github_page + 1}&q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
             )
-            sleep(GITHUB_HTTP_DELAY)
-            github_soup_page = BeautifulSoup(github_html_page.text, 'html.parser')
+            time.sleep(GITHUB_HTTP_DELAY)
+            github_soup_page = bs4.BeautifulSoup(github_html_page.text, 'html.parser')
             github_search_date = datetime.now().strftime('%F %T')
             for github_search_occurrence in github_soup_page.find_all('a', {'data-hydro-click': True}):
                 github_search_result.update({
@@ -230,8 +230,8 @@ def github_logout(github_http_session):
         github_html_root = github_http_session.get(
             'https://github.com',
         )
-        sleep(GITHUB_HTTP_DELAY)
-        github_soup_root = BeautifulSoup(github_html_root.text, 'html.parser')
+        time.sleep(GITHUB_HTTP_DELAY)
+        github_soup_root = bs4.BeautifulSoup(github_html_root.text, 'html.parser')
         form_data_logout = {
             'authenticity_token': github_soup_root.find('input', {'name': 'authenticity_token'})['value'],
         }
@@ -244,9 +244,9 @@ def github_logout(github_http_session):
         })
         github_http_session.post(
             'https://github.com/logout',
-            data = urlencode(form_data_logout),
+            data = parse.urlencode(form_data_logout),
         )
-        sleep(GITHUB_HTTP_DELAY)
+        time.sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
     except Exception as e:
         raise MsgException(e, 'Unable to log out from GitHub')
