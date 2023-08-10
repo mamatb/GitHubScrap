@@ -19,10 +19,10 @@ import sys
 import json
 import time
 import pyotp
+import datetime
 import requests
 from os import path
 from urllib import parse
-from datetime import datetime
 
 GITHUB_HTTP_DELAY = 1.5
 SLACK_HTTP_DELAY = 1.5
@@ -214,7 +214,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
             )
             time.sleep(GITHUB_HTTP_DELAY)
             github_soup_page = bs4.BeautifulSoup(github_html_page.text, 'html.parser')
-            github_search_date = datetime.now().strftime('%F %T')
+            github_search_date = datetime.datetime.now().strftime('%F %T')
             for github_search_occurrence in github_soup_page.find_all('a', {'data-hydro-click': True}):
                 github_search_result.update({
                     f'''https://github.com{github_search_occurrence['href']}''': f'{github_search_date}',
