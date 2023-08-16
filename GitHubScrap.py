@@ -52,7 +52,7 @@ def print_usage():
 def print_info(message):
     '''additional info printing'''
 
-    print(f'[!] Info: {message}', file = sys.stdout)
+    print(f'[!] Info: {message}', file = sys.stderr)
 
 def load_config(config_path):
     '''JSON config file reading'''
