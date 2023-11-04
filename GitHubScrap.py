@@ -14,16 +14,16 @@
 # use argument parser (argparse)
 # add module docstring
 
-import sys
-import json
-import requests
-from time import sleep as time_sleep
-from re import compile as re_compile
-from pyotp import TOTP as pyotp_totp
-from urllib import parse as urllib_parse
-from os.path import exists as path_exists
-from datetime.datetime import now as datetime_now
 from bs4 import BeautifulSoup as bs4_beautifulsoup
+from datetime.datetime import now as datetime_now
+import json
+from os.path import exists as path_exists
+from pyotp import TOTP as pyotp_totp
+from re import compile as re_compile
+import requests
+import sys
+from time import sleep as time_sleep
+from urllib import parse as urllib_parse
 
 GITHUB_HTTP_DELAY = 1.5
 SLACK_HTTP_DELAY = 1.5
