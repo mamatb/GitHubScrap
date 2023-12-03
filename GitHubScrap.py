@@ -14,11 +14,11 @@
 # use argument parser (argparse)
 # add module docstring
 
-from bs4 import BeautifulSoup as bs4_beautifulsoup
+from bs4 import BeautifulSoup
 from datetime.datetime import now as datetime_now
 import json
 from os.path import exists as path_exists
-from pyotp import TOTP as pyotp_totp
+from pyotp import TOTP
 from re import compile as re_compile
 import requests
 import sys
@@ -139,7 +139,7 @@ def github_login(github_http_session, github_username, github_password, github_o
             'https://github.com/login',
         )
         time_sleep(GITHUB_HTTP_DELAY)
-        github_soup_login = bs4_beautifulsoup(github_html_login.text, 'html.parser')
+        github_soup_login = BeautifulSoup(github_html_login.text, 'html.parser')
         form_data_login = {
             'commit': 'Sign in',
             'authenticity_token': github_soup_login.find('input', {'name': 'authenticity_token'})['value'],
@@ -163,7 +163,7 @@ def github_login(github_http_session, github_username, github_password, github_o
             data = urllib_parse.urlencode(form_data_login),
         )
         time_sleep(GITHUB_HTTP_DELAY)
-        github_soup_twofactor = bs4_beautifulsoup(github_html_twofactor.text, 'html.parser')
+        github_soup_twofactor = BeautifulSoup(github_html_twofactor.text, 'html.parser')
         form_data_otp = {
             'authenticity_token': github_soup_twofactor.find('input', {'name': 'authenticity_token'})['value'],
         }
@@ -172,7 +172,7 @@ def github_login(github_http_session, github_username, github_password, github_o
 
     try: # 3rd request (submit the OTP form)
         form_data_otp.update({
-            'otp': pyotp_totp(github_otp).now(),
+            'otp': TOTP(github_otp).now(),
         })
         github_http_session.post(
             'https://github.com/sessions/two-factor',
@@ -191,7 +191,7 @@ def github_search_count(github_http_session, github_query_term, github_type):
             f'https://github.com/search/count?q={urllib_parse.quote_plus(github_query_term)}&type={urllib_parse.quote_plus(github_type)}',
         )
         time_sleep(GITHUB_HTTP_DELAY)
-        github_soup_count = bs4_beautifulsoup(github_html_count.text, 'html.parser')
+        github_soup_count = BeautifulSoup(github_html_count.text, 'html.parser')
         github_count = github_soup_count.span.text
     except Exception as e:
         raise MsgException(e, 'Unable to count GitHub search results')
@@ -205,7 +205,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
             f'https://github.com/search?o=desc&q={urllib_parse.quote_plus(github_query_term)}&type={urllib_parse.quote_plus(github_type)}',
         )
         time_sleep(GITHUB_HTTP_DELAY)
-        github_soup_pages = bs4_beautifulsoup(github_html_pages.text, 'html.parser')
+        github_soup_pages = BeautifulSoup(github_html_pages.text, 'html.parser')
         github_pages_tag = github_soup_pages.find('em', {'data-total-pages': True})
         github_pages = github_pages_tag['data-total-pages'] if github_pages_tag else 1
         github_search_result = {}
@@ -214,7 +214,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
                 f'https://github.com/search?o=desc&p={github_page + 1}&q={urllib_parse.quote_plus(github_query_term)}&type={urllib_parse.quote_plus(github_type)}',
             )
             time_sleep(GITHUB_HTTP_DELAY)
-            github_soup_page = bs4_beautifulsoup(github_html_page.text, 'html.parser')
+            github_soup_page = BeautifulSoup(github_html_page.text, 'html.parser')
             github_search_date = datetime_now().strftime('%F %T')
             for github_search_occurrence in github_soup_page.find_all('a', {'data-hydro-click': True}):
                 github_search_result.update({
@@ -232,7 +232,7 @@ def github_logout(github_http_session):
             'https://github.com',
         )
         time_sleep(GITHUB_HTTP_DELAY)
-        github_soup_root = bs4_beautifulsoup(github_html_root.text, 'html.parser')
+        github_soup_root = BeautifulSoup(github_html_root.text, 'html.parser')
         form_data_logout = {
             'authenticity_token': github_soup_root.find('input', {'name': 'authenticity_token'})['value'],
         }
