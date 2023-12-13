@@ -9,6 +9,7 @@
 #
 # readme.md
 # randomize delays with jitters
+# OOP refactor
 # classify findings by query term and github type
 # parse web forms instead of forging them
 # use argument parser (argparse)
