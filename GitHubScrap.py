@@ -13,6 +13,7 @@
 # classify findings by query term and github type
 # parse web forms instead of forging them
 # use argument parser (argparse)
+# use type annotations
 # add module docstring
 
 from bs4 import BeautifulSoup
