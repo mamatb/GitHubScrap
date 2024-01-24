@@ -35,18 +35,16 @@ class MsgException(Exception):
         super().__init__(*args, **kwargs)
         self.message = message
         self.exception = exception
-
+    
     def __str__(self):
         return f'[!] Error! {self.message}:\n    {self.exception}'
-
-def panic(msg_exception):
-    '''exception handling'''
-
-    print(msg_exception, file = sys.stderr)
+    
+    def panic(self):
+        print(self, file = sys.stderr)
 
 def print_usage():
     '''usage printing'''
-
+    
     print(
         '[!] Wrong syntax. Usage:\n'
         '    python3 gitsearch.py <config_file> <output_file>'
@@ -54,12 +52,12 @@ def print_usage():
 
 def print_info(message):
     '''additional info printing'''
-
+    
     print(f'[!] Info: {message}', file = sys.stderr)
 
 def load_config(config_path):
     '''JSON config file reading'''
-
+    
     try:
         with open(config_path) as config_file:
             config_json = json.load(config_file)
@@ -75,7 +73,7 @@ def load_config(config_path):
 
 def save_output_return_unseen(urls_dict_new, output_path):
     '''JSON output file writing'''
-
+    
     try:
         urls_new = set(urls_dict_new.keys())
         urls_old = {}
@@ -95,7 +93,7 @@ def save_output_return_unseen(urls_dict_new, output_path):
 
 def notify_slack(urls_unseen, slack_webhook):
     '''Slack notification through webhook'''
-
+    
     try:
         print_info('sending Slack notifications ...')
         slack_http_headers = {
@@ -135,7 +133,7 @@ def notify_slack(urls_unseen, slack_webhook):
 
 def github_login(github_http_session, github_username, github_password, github_otp):
     '''github logging in (3 requests needed)'''
-
+    
     try: # 1st request (grab some data needed for the login form)
         github_html_login = github_http_session.get(
             'https://github.com/login',
@@ -155,7 +153,7 @@ def github_login(github_http_session, github_username, github_password, github_o
         }
     except Exception as e:
         raise MsgException(e, 'Unable to HTTP-GET GitHub login data')
-
+    
     try: # 2nd request (submit the login form and grab some data needed for the OTP form)
         github_http_session.headers.update({
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -171,7 +169,7 @@ def github_login(github_http_session, github_username, github_password, github_o
         }
     except Exception as e:
         raise MsgException(e, 'Unable to log in to GitHub (credentials)')
-
+    
     try: # 3rd request (submit the OTP form)
         form_data_otp.update({
             'otp': pyotp.TOTP(github_otp).now(),
@@ -187,7 +185,7 @@ def github_login(github_http_session, github_username, github_password, github_o
 
 def github_search_count(github_http_session, github_query_term, github_type):
     '''search results count'''
-
+    
     try:
         github_html_count = github_http_session.get(
             f'https://github.com/search/count?q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
@@ -201,7 +199,7 @@ def github_search_count(github_http_session, github_query_term, github_type):
 
 def github_search_retrieval(github_http_session, github_query_term, github_type):
     '''search results retrieval'''
-
+    
     try:
         github_html_pages = github_http_session.get(
             f'https://github.com/search?o=desc&q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
@@ -228,7 +226,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
 
 def github_logout(github_http_session):
     '''github logging out (2 requests needed)'''
-
+    
     try: # 1st request (grab some data needed for the logout form)
         github_html_root = github_http_session.get(
             'https://github.com',
@@ -240,7 +238,7 @@ def github_logout(github_http_session):
         }
     except Exception as e:
         raise MsgException(e, 'Unable to HTTP-GET GitHub logout data')
-
+    
     try: # 2nd request (submit the logout form)
         github_http_session.headers.update({
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -256,7 +254,7 @@ def github_logout(github_http_session):
 
 def main():
     '''main'''
-
+    
     if len(sys.argv) != 3:
         print_usage()
         sys.exit(-1)
@@ -296,9 +294,9 @@ def main():
                     if slack_webhook and unseen_urls:
                         notify_slack(unseen_urls, slack_webhook)
     except MsgException as msg_exception:
-        panic(msg_exception)
+        msg_exception.panic()
     except Exception as e:
-        panic(MsgException(e))
+        MsgException(e).panic()
     finally:
         try:
             github_logout(github_http_session)
