@@ -67,9 +67,9 @@ def load_config(config_path):
             github_query_exact = config_json.get('github_query_exact')
             github_query_terms = config_json.get('github_query_terms')
             slack_webhook = config_json.get('slack_webhook')
+        return github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook
     except Exception as e:
         raise MsgException(e, 'Unable to read config file')
-    return github_username, github_password, github_otp, github_query_exact, github_query_terms, slack_webhook
 
 def save_output_return_unseen(urls_dict_new, output_path):
     '''JSON output file writing'''
@@ -87,9 +87,9 @@ def save_output_return_unseen(urls_dict_new, output_path):
         else:
             with open(output_path, 'w') as output_file:
                 json.dump(urls_dict_new, output_file)
+        return urls_new.difference(urls_old)
     except Exception as e:
         raise MsgException(e, 'Unable to write output file')
-    return urls_new.difference(urls_old)
 
 def notify_slack(urls_unseen, slack_webhook):
     '''Slack notification through webhook'''
@@ -193,9 +193,9 @@ def github_search_count(github_http_session, github_query_term, github_type):
         time.sleep(GITHUB_HTTP_DELAY)
         github_soup_count = bs4.BeautifulSoup(github_html_count.text, 'html.parser')
         github_count = github_soup_count.span.text
+        return github_count
     except Exception as e:
         raise MsgException(e, 'Unable to count GitHub search results')
-    return github_count
 
 def github_search_retrieval(github_http_session, github_query_term, github_type):
     '''search results retrieval'''
@@ -220,9 +220,9 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
                 github_search_result.update({
                     f'''https://github.com{github_search_occurrence['href']}''': f'{github_search_date}',
                 })
+        return github_search_result
     except Exception as e:
         raise MsgException(e, 'Unable to retrieve GitHub search results')
-    return github_search_result
 
 def github_logout(github_http_session):
     '''github logging out (2 requests needed)'''
