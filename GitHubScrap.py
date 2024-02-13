@@ -114,7 +114,7 @@ def notify_slack(urls_unseen, slack_webhook):
         for url in urls_unseen:
             urls_string += f'{url}\n'
             urls_count += 1
-            if not urls_count % 8:
+            if urls_count % 8 == 0:
                 slack_http_data.update({
                     'text': urls_string,
                 })
@@ -125,7 +125,7 @@ def notify_slack(urls_unseen, slack_webhook):
                 )
                 time.sleep(SLACK_HTTP_DELAY)
                 urls_string = ''
-        if urls_string:
+        if len(urls_string) != 0:
             slack_http_data.update({
                 'text': urls_string,
             })
@@ -218,7 +218,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
         time.sleep(GITHUB_HTTP_DELAY)
         github_soup_pages = bs4.BeautifulSoup(github_html_pages.text, 'html.parser')
         github_pages_tag = github_soup_pages.find('em', {'data-total-pages': True})
-        github_pages = github_pages_tag['data-total-pages'] if github_pages_tag else 1
+        github_pages = github_pages_tag['data-total-pages'] if github_pages_tag is not None else 1
         github_search_result = {}
         for github_page in range(int(github_pages)):
             github_html_page = github_http_session.get(
@@ -304,7 +304,7 @@ def main():
                 print_info(f'{github_count} results while looking for {github_query_term} ({github_type})')
                 if github_count != '0':
                     unseen_urls = save_output_return_unseen(github_search_retrieval(github_http_session, github_query_term, github_type), sys.argv[2])
-                    if slack_webhook and unseen_urls:
+                    if len(slack_webhook) != 0 and len(unseen_urls) != 0:
                         notify_slack(unseen_urls, slack_webhook)
     except MsgException as msg_exception:
         msg_exception.panic()
