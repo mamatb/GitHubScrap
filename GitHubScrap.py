@@ -16,48 +16,54 @@
 # use type annotations
 # add module docstring
 
-import bs4
 import datetime
 import json
 from os import path
-import pyotp
 import re
-import requests
 import sys
 import time
 from urllib import parse
 
+import bs4
+import pyotp
+import requests
+
 GITHUB_HTTP_DELAY = 1.5
 SLACK_HTTP_DELAY = 1.5
 
+
 class MsgException(Exception):
-    def __init__(self, exception, message = 'Unknown error', *args, **kwargs):
+    def __init__(self, exception, message='Unknown error', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.message = message
         self.exception = exception
-    
+
     def __str__(self):
         return f'[!] Error! {self.message}:\n    {self.exception}'
-    
+
     def panic(self):
-        print(self, file = sys.stderr)
+        print(self, file=sys.stderr)
+
 
 def print_usage():
     '''usage printing'''
-    
+
     print(
         '[!] Wrong syntax. Usage:\n'
-        '    python3 gitsearch.py <config_file> <output_file>'
-    , file = sys.stderr)
+        '    python3 GitHubScrap.py <config_file> <output_file>',
+        file=sys.stderr
+    )
+
 
 def print_info(message):
     '''additional info printing'''
-    
-    print(f'[!] Info: {message}', file = sys.stderr)
+
+    print(f'[!] Info: {message}', file=sys.stderr)
+
 
 def load_config(config_path):
     '''JSON config file reading'''
-    
+
     try:
         with open(config_path) as config_file:
             config_json = json.load(config_file)
@@ -71,9 +77,10 @@ def load_config(config_path):
     except Exception as e:
         raise MsgException(e, 'Unable to read config file')
 
+
 def save_output_return_unseen(urls_dict_new, output_path):
     '''JSON output file writing'''
-    
+
     try:
         urls_new = set(urls_dict_new.keys())
         urls_old = {}
@@ -91,9 +98,10 @@ def save_output_return_unseen(urls_dict_new, output_path):
     except Exception as e:
         raise MsgException(e, 'Unable to write output file')
 
+
 def notify_slack(urls_unseen, slack_webhook):
     '''Slack notification through webhook'''
-    
+
     try:
         print_info('sending Slack notifications ...')
         slack_http_headers = {
@@ -112,8 +120,8 @@ def notify_slack(urls_unseen, slack_webhook):
                 })
                 requests.post(
                     slack_webhook,
-                    headers = slack_http_headers,
-                    data = json.dumps(slack_http_data),
+                    headers=slack_http_headers,
+                    data=json.dumps(slack_http_data),
                 )
                 time.sleep(SLACK_HTTP_DELAY)
                 urls_string = ''
@@ -123,18 +131,19 @@ def notify_slack(urls_unseen, slack_webhook):
             })
             requests.post(
                 slack_webhook,
-                headers = slack_http_headers,
-                data = json.dumps(slack_http_data),
+                headers=slack_http_headers,
+                data=json.dumps(slack_http_data),
             )
             time.sleep(SLACK_HTTP_DELAY)
             urls_string = ''
     except Exception as e:
         raise MsgException(e, 'Unable to send Slack notifications')
 
+
 def github_login(github_http_session, github_username, github_password, github_otp):
     '''github logging in (3 requests needed)'''
-    
-    try: # 1st request (grab some data needed for the login form)
+
+    try:  # 1st request (grab some data needed for the login form)
         github_html_login = github_http_session.get(
             'https://github.com/login',
         )
@@ -153,14 +162,14 @@ def github_login(github_http_session, github_username, github_password, github_o
         }
     except Exception as e:
         raise MsgException(e, 'Unable to HTTP-GET GitHub login data')
-    
-    try: # 2nd request (submit the login form and grab some data needed for the OTP form)
+
+    try:  # 2nd request (submit the login form and grab some data needed for the OTP form)
         github_http_session.headers.update({
             'Content-Type': 'application/x-www-form-urlencoded',
         })
         github_html_twofactor = github_http_session.post(
             'https://github.com/session',
-            data = parse.urlencode(form_data_login),
+            data=parse.urlencode(form_data_login),
         )
         time.sleep(GITHUB_HTTP_DELAY)
         github_soup_twofactor = bs4.BeautifulSoup(github_html_twofactor.text, 'html.parser')
@@ -169,23 +178,24 @@ def github_login(github_http_session, github_username, github_password, github_o
         }
     except Exception as e:
         raise MsgException(e, 'Unable to log in to GitHub (credentials)')
-    
-    try: # 3rd request (submit the OTP form)
+
+    try:  # 3rd request (submit the OTP form)
         form_data_otp.update({
             'otp': pyotp.TOTP(github_otp).now(),
         })
         github_http_session.post(
             'https://github.com/sessions/two-factor',
-            data = parse.urlencode(form_data_otp),
+            data=parse.urlencode(form_data_otp),
         )
         time.sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
     except Exception as e:
         raise MsgException(e, 'Unable to log in to GitHub (OTP)')
 
+
 def github_search_count(github_http_session, github_query_term, github_type):
     '''search results count'''
-    
+
     try:
         github_html_count = github_http_session.get(
             f'https://github.com/search/count?q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
@@ -197,9 +207,10 @@ def github_search_count(github_http_session, github_query_term, github_type):
     except Exception as e:
         raise MsgException(e, 'Unable to count GitHub search results')
 
+
 def github_search_retrieval(github_http_session, github_query_term, github_type):
     '''search results retrieval'''
-    
+
     try:
         github_html_pages = github_http_session.get(
             f'https://github.com/search?o=desc&q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
@@ -224,10 +235,11 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
     except Exception as e:
         raise MsgException(e, 'Unable to retrieve GitHub search results')
 
+
 def github_logout(github_http_session):
     '''github logging out (2 requests needed)'''
-    
-    try: # 1st request (grab some data needed for the logout form)
+
+    try:  # 1st request (grab some data needed for the logout form)
         github_html_root = github_http_session.get(
             'https://github.com',
         )
@@ -238,23 +250,24 @@ def github_logout(github_http_session):
         }
     except Exception as e:
         raise MsgException(e, 'Unable to HTTP-GET GitHub logout data')
-    
-    try: # 2nd request (submit the logout form)
+
+    try:  # 2nd request (submit the logout form)
         github_http_session.headers.update({
             'Content-Type': 'application/x-www-form-urlencoded',
         })
         github_http_session.post(
             'https://github.com/logout',
-            data = parse.urlencode(form_data_logout),
+            data=parse.urlencode(form_data_logout),
         )
         time.sleep(GITHUB_HTTP_DELAY)
         github_http_session.headers.pop('Content-Type')
     except Exception as e:
         raise MsgException(e, 'Unable to log out from GitHub')
 
+
 def main():
     '''main'''
-    
+
     if len(sys.argv) != 3:
         print_usage()
         sys.exit(-1)
@@ -286,7 +299,7 @@ def main():
             'users',
         ]
         for github_query_term in github_query_terms:
-            for github_type in github_types:                
+            for github_type in github_types:
                 github_count = github_search_count(github_http_session, github_query_term, github_type)
                 print_info(f'{github_count} results while looking for {github_query_term} ({github_type})')
                 if github_count != '0':
@@ -301,8 +314,10 @@ def main():
         try:
             github_logout(github_http_session)
             github_http_session.close()
-        except:
+        except Exception as e:
+            MsgException(e).panic()
             sys.exit(-1)
+
 
 if __name__ == '__main__':
     main()
