@@ -46,8 +46,7 @@ class MsgException(Exception):
 
 
 def print_usage():
-    '''usage printing'''
-
+    """Print usage."""
     print(
         '[!] Wrong syntax. Usage:\n'
         '    python3 GitHubScrap.py <config_file> <output_file>',
@@ -56,14 +55,12 @@ def print_usage():
 
 
 def print_info(message):
-    '''additional info printing'''
-
+    """Print additional information."""
     print(f'[!] Info: {message}', file=sys.stderr)
 
 
 def load_config(config_path):
-    '''JSON config file reading'''
-
+    """Read JSON config file."""
     try:
         with open(config_path) as config_file:
             config_json = json.load(config_file)
@@ -79,8 +76,7 @@ def load_config(config_path):
 
 
 def save_output_return_unseen(urls_dict_new, output_path):
-    '''JSON output file writing'''
-
+    """Write JSON output file."""
     try:
         urls_new = set(urls_dict_new.keys())
         urls_old = {}
@@ -100,8 +96,7 @@ def save_output_return_unseen(urls_dict_new, output_path):
 
 
 def notify_slack(urls_unseen, slack_webhook):
-    '''Slack notification through webhook'''
-
+    """Notify Slack through webhook."""
     try:
         print_info('sending Slack notifications ...')
         slack_http_headers = {
@@ -141,8 +136,7 @@ def notify_slack(urls_unseen, slack_webhook):
 
 
 def github_login(github_http_session, github_username, github_password, github_otp):
-    '''github logging in (3 requests needed)'''
-
+    """Log in to GitHub (3 requests needed)."""
     try:  # 1st request (grab some data needed for the login form)
         github_html_login = github_http_session.get(
             'https://github.com/login',
@@ -194,8 +188,7 @@ def github_login(github_http_session, github_username, github_password, github_o
 
 
 def github_search_count(github_http_session, github_query_term, github_type):
-    '''search results count'''
-
+    """Count search results."""
     try:
         github_html_count = github_http_session.get(
             f'https://github.com/search/count?q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
@@ -209,8 +202,7 @@ def github_search_count(github_http_session, github_query_term, github_type):
 
 
 def github_search_retrieval(github_http_session, github_query_term, github_type):
-    '''search results retrieval'''
-
+    """Retrieve search results."""
     try:
         github_html_pages = github_http_session.get(
             f'https://github.com/search?o=desc&q={parse.quote_plus(github_query_term)}&type={parse.quote_plus(github_type)}',
@@ -237,8 +229,7 @@ def github_search_retrieval(github_http_session, github_query_term, github_type)
 
 
 def github_logout(github_http_session):
-    '''github logging out (2 requests needed)'''
-
+    """Log out from GitHub (2 requests needed)."""
     try:  # 1st request (grab some data needed for the logout form)
         github_html_root = github_http_session.get(
             'https://github.com',
@@ -265,9 +256,7 @@ def github_logout(github_http_session):
         raise MsgException(e, 'Unable to log out from GitHub')
 
 
-def main():
-    '''main'''
-
+def main():  # pylint: disable=C0116
     if len(sys.argv) != 3:
         print_usage()
         sys.exit(-1)
