@@ -5,17 +5,6 @@
 # location - https://github.com/mamatb/GitHubScrap
 # style guide - https://google.github.io/styleguide/pyguide.html
 
-# TODO
-#
-# readme.md
-# randomize delays with jitters
-# OOP refactor
-# classify findings by query term and github type
-# parse web forms instead of forging them
-# use argument parser (argparse)
-# use type annotations
-# add module docstring
-
 import datetime
 import json
 from os import path
